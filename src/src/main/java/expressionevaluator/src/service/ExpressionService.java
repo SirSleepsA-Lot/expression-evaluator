@@ -1,6 +1,10 @@
 package expressionevaluator.src.service;
 
-import expressionevaluator.src.model.Node;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import expressionevaluator.src.model.Operator;
+import expressionevaluator.src.model.Variable;
+import expressionevaluator.src.service.interfaces.EvaluationService;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -9,7 +13,7 @@ import java.util.Stack;
 @Service
 public class ExpressionService {
     private static final Map<String, Integer> precedenceMap;
-
+    private EvaluationService evaluationService;
     static {
         precedenceMap = new HashMap<>();
         precedenceMap.put("||", 1);  // Logical OR has lowest precedence
@@ -26,10 +30,19 @@ public class ExpressionService {
         precedenceMap.put("/", 6);
         precedenceMap.put("%", 6);
     }
+    public String readVariable(String expression, Integer i){
+        StringBuilder variableBuilder = new StringBuilder();
+        while (i < expression.length() && !operatorStart(expression.charAt(i)) && expression.charAt(i) != '(' && expression.charAt(i) != ')') {
+            variableBuilder.append(expression.charAt(i));
+            i++;
+        }
+        i--; // Move back one step, as the loop will increment it again
+        return variableBuilder.toString();
 
+    }
     public Stack<Object> infixToPostfix(String expression) {
         expression = expression.replaceAll("\\s", "");
-        Stack<String> operatorStack = new Stack<>();
+        Stack<Operator> operatorStack = new Stack<>();
         Stack<Object> postfixStack = new Stack<>();
 
         for (int i = 0; i < expression.length(); i++) {
@@ -39,25 +52,44 @@ public class ExpressionService {
                 continue; // Skip whitespaces
             }
 
-            if (Character.isLetterOrDigit(ch) || ch == '\"') {
+            if (Character.isLetter(ch) || ch == '_') {
                 // If it's a variable or operand
-                StringBuilder variableBuilder = new StringBuilder();
-                while (i < expression.length() && !operatorStart(expression.charAt(i))) {
-                    variableBuilder.append(expression.charAt(i));
-                    i++;
+                String readVariable = readVariable( expression, i);
+                i += readVariable.length() - 1;
+                switch (readVariable) {
+                    case "null":
+                        postfixStack.push(null);
+                        break;
+                    case "true":
+                        postfixStack.push(true);
+                        break;
+                    case "false":
+                        postfixStack.push(false);
+                        break;
+                    default:
+                        Variable variableOrOperand = new Variable(readVariable( expression, i));
+                        postfixStack.push(variableOrOperand);
                 }
-                i--; // Move back one step, as the loop will increment it again
-                String variableOrOperand = variableBuilder.toString();
-                postfixStack.push(variableOrOperand);
-            } else if (ch == '(') {
-                operatorStack.push(ch + ""); // Push opening parenthesis to the stack
+
+            } else if (Character.isDigit(ch)){
+                String number = readVariable( expression, i);
+                i += number.length() - 1;
+                float castedNumber = Float.parseFloat(number);
+                postfixStack.push(castedNumber);
+            }else if (ch == '\"'){
+                String stringValue = readVariable( expression, i);
+                i += stringValue.length() - 1;
+
+                postfixStack.push(stringValue.substring(1, stringValue.length() - 1));
+            }else if (ch == '(') {
+                operatorStack.push(new Operator(ch + "")); // Push opening parenthesis to the stack
             } else if (ch == ')') {
                 // Pop operators and push to postfix stack until matching '('
-                while (!operatorStack.isEmpty() && !operatorStack.peek().equals("(")) {
-                    String operator = operatorStack.pop();
+                while (!operatorStack.isEmpty() && !operatorStack.peek().getValue().equals("(")) {
+                    Operator operator = operatorStack.pop();
                     postfixStack.push(operator);
                 }
-                if (!operatorStack.isEmpty() && operatorStack.peek().equals("(")) {
+                if (!operatorStack.isEmpty() && operatorStack.peek().getValue().equals("(")) {
                     operatorStack.pop(); // Remove '(' from stack
                 }
             } else {
@@ -68,9 +100,11 @@ public class ExpressionService {
                     i++;
                 }
                 i--; // Move back one step, as the loop will increment it again
-                String operator = operatorBuilder.toString();
-                while (!operatorStack.isEmpty() && precedence(operatorStack.peek()) >= precedence(operator)) {
-                    postfixStack.push(operatorStack.pop());
+                Operator operator = new Operator(operatorBuilder.toString());
+                while (!operatorStack.isEmpty() && precedence(operatorStack.peek().getValue()) >= precedence(operator.getValue())) {
+                    Operator oper = operatorStack.pop();
+                    if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
+                    postfixStack.push(oper);
                 }
                 operatorStack.push(operator); // Push current operator to stack
             }
@@ -78,7 +112,9 @@ public class ExpressionService {
 
         // Pop remaining operators and push to postfix stack
         while (!operatorStack.isEmpty()) {
-            postfixStack.push(operatorStack.pop());
+            Operator oper = operatorStack.pop();
+            if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
+            postfixStack.push(oper);
         }
 
         return postfixStack;
@@ -97,5 +133,60 @@ public class ExpressionService {
         }
         return result.toString();
     }
-    
+
+    private Object getVariableValue(Variable variable, JsonObject variables) throws Exception {
+        // Split the variable by '.' to handle nested keys
+        String[] keys = variable.getValue().split("\\.");
+        JsonObject currentObj = variables;
+        for (String key : keys) {
+            JsonElement element = currentObj.get(key);
+            if (element != null && !element.isJsonNull()) {
+                if (element.isJsonObject()) {
+                    currentObj = element.getAsJsonObject();
+                } else if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isBoolean()) {
+                    if(element.getAsJsonPrimitive().isBoolean()) return element.getAsBoolean();
+                    else if(element.getAsJsonPrimitive().isNumber()) return element.getAsFloat();
+                    else if(element.getAsJsonPrimitive().isString()) return element.getAsString();
+
+                }
+            } else {
+                // Key not found or value is null, return false
+                throw new Exception(String.format("Variable %s not found in JSON object", variable));
+            }
+        }
+        return false;
+    }
+
+    private boolean evaluateExpression(String expression, JsonObject inputVariables) throws Exception {
+        Stack<Object> postfixStack = infixToPostfix(expression);
+        Stack<Object> helperStack = new Stack<>();
+        while(!postfixStack.isEmpty()){
+            Object element = postfixStack.pop();
+            if(element instanceof Variable){
+                element = getVariableValue((Variable) element, inputVariables);
+            }
+            if(element instanceof Operator) {
+                helperStack.push(element);
+            }
+            else{
+                Object element2 = null;
+                if(!(helperStack.peek() instanceof Operator)) {
+                    element2 = helperStack.pop();
+                }
+                else if(postfixStack.peek() instanceof Operator) {
+                    helperStack.push(element);
+                    continue;
+                }
+                else{
+                    element2 = postfixStack.pop();
+                }
+                if(helperStack.isEmpty() || !(helperStack.peek() instanceof Operator)) throw new RuntimeException("Logical expression is invalid");
+                Operator operator = (Operator) helperStack.pop();
+                Object result = evaluationService.resolve(element, element2, operator);
+                postfixStack.push(result);
+            }
+        }
+        return false;
+    }
+
 }
