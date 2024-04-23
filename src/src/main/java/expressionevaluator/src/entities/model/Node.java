@@ -1,4 +1,4 @@
-package expressionevaluator.src.model;
+package expressionevaluator.src.entities.model;
 
 public class Node {
     private String operand;

@@ -2,8 +2,10 @@ package expressionevaluator.src.service;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import expressionevaluator.src.model.Operator;
-import expressionevaluator.src.model.Variable;
+import expressionevaluator.src.entities.model.Expression;
+import expressionevaluator.src.entities.model.Operator;
+import expressionevaluator.src.entities.model.Variable;
+import expressionevaluator.src.repository.ExpressionRepository;
 import expressionevaluator.src.service.interfaces.EvaluationService;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +15,7 @@ import java.util.Stack;
 @Service
 public class ExpressionService {
     private static final Map<String, Integer> precedenceMap;
+    private final ExpressionRepository expressionRepository;
     private EvaluationService evaluationService;
     static {
         precedenceMap = new HashMap<>();
@@ -29,6 +32,14 @@ public class ExpressionService {
         precedenceMap.put("*", 6);   // Multiplication, division, and modulus
         precedenceMap.put("/", 6);
         precedenceMap.put("%", 6);
+    }
+
+    public ExpressionService(ExpressionRepository expressionRepository) {
+        this.expressionRepository = expressionRepository;
+    }
+    public Expression saveExpression(Expression expression){
+        expressionRepository.save(expression);
+        return expression;
     }
     public String readVariable(String expression, Integer i){
         StringBuilder variableBuilder = new StringBuilder();
@@ -157,7 +168,16 @@ public class ExpressionService {
         return false;
     }
 
-    private boolean evaluateExpression(String expression, JsonObject inputVariables) throws Exception {
+    public boolean evaluateExpression(Long expressionId, JsonObject inputVariables) throws Exception {
+
+        var expressionEntity = expressionRepository.findById(expressionId).orElse(null);
+        String expression;
+        if(expressionEntity != null){
+            expression = expressionEntity.getExpression();
+        }
+        else{
+            throw new Exception("expression not found");
+        }
         Stack<Object> postfixStack = infixToPostfix(expression);
         Stack<Object> helperStack = new Stack<>();
         while(!postfixStack.isEmpty()){

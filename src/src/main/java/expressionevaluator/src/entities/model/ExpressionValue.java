@@ -1,6 +1,4 @@
-package expressionevaluator.src.model;
-
-import java.util.Objects;
+package expressionevaluator.src.entities.model;
 
 public abstract class ExpressionValue {
     private String value;

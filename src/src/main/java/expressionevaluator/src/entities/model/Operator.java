@@ -1,4 +1,4 @@
-package expressionevaluator.src.model;
+package expressionevaluator.src.entities.model;
 
 import java.util.Objects;
 

@@ -1,6 +1,6 @@
 package expressionevaluator.src.service;
 
-import expressionevaluator.src.model.Operator;
+import expressionevaluator.src.entities.model.Operator;
 import expressionevaluator.src.service.interfaces.EvaluationService;
 import org.springframework.stereotype.Service;
 
