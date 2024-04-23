@@ -16,7 +16,7 @@ import java.util.Stack;
 public class ExpressionService {
     private static final Map<String, Integer> precedenceMap;
     private final ExpressionRepository expressionRepository;
-    private EvaluationService evaluationService;
+    private final EvaluationService evaluationService;
     static {
         precedenceMap = new HashMap<>();
         precedenceMap.put("||", 1);  // Logical OR has lowest precedence
@@ -34,8 +34,9 @@ public class ExpressionService {
         precedenceMap.put("%", 6);
     }
 
-    public ExpressionService(ExpressionRepository expressionRepository) {
+    public ExpressionService(ExpressionRepository expressionRepository, EvaluationService evaluationService) {
         this.expressionRepository = expressionRepository;
+        this.evaluationService = evaluationService;
     }
     public Expression saveExpression(Expression expression){
         expressionRepository.save(expression);
@@ -78,7 +79,7 @@ public class ExpressionService {
                         postfixStack.push(false);
                         break;
                     default:
-                        Variable variableOrOperand = new Variable(readVariable( expression, i));
+                        Variable variableOrOperand = new Variable(readVariable);
                         postfixStack.push(variableOrOperand);
                 }
 
@@ -154,7 +155,7 @@ public class ExpressionService {
             if (element != null && !element.isJsonNull()) {
                 if (element.isJsonObject()) {
                     currentObj = element.getAsJsonObject();
-                } else if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isBoolean()) {
+                } else if (element.isJsonPrimitive()) {
                     if(element.getAsJsonPrimitive().isBoolean()) return element.getAsBoolean();
                     else if(element.getAsJsonPrimitive().isNumber()) return element.getAsFloat();
                     else if(element.getAsJsonPrimitive().isString()) return element.getAsString();
@@ -199,6 +200,9 @@ public class ExpressionService {
                 }
                 else{
                     element2 = postfixStack.pop();
+                    if(element2 instanceof Variable){
+                        element2 = getVariableValue((Variable) element2, inputVariables);
+                    }
                 }
                 if(helperStack.isEmpty() || !(helperStack.peek() instanceof Operator)) throw new RuntimeException("Logical expression is invalid");
                 Operator operator = (Operator) helperStack.pop();

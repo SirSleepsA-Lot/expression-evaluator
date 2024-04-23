@@ -1,5 +1,6 @@
 package expressionevaluator.src.controllers;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import expressionevaluator.src.entities.model.Expression;
 import expressionevaluator.src.service.ExpressionService;
@@ -30,8 +31,10 @@ public class ExpressionController {
     }
     @PostMapping("/expression/{id}")
     public ResponseEntity<Boolean> printExpressionTree(@PathVariable(value = "id") Long expressionId, @RequestBody Map<String, Object> requestBody) throws Exception {
-        var object2 = requestBody;
-        //Boolean evaluation = expressionService.evaluateExpression(expressionId, object);
+        Gson gson = new Gson();
+        String json = gson.toJson(requestBody);
+        JsonObject jsonObject = gson.fromJson(json, JsonObject.class);
+        Boolean evaluation = expressionService.evaluateExpression(expressionId, jsonObject);
         return ResponseEntity.ok(true);
     }
 
