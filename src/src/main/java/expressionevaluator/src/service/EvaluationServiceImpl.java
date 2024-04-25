@@ -1,6 +1,6 @@
 package expressionevaluator.src.service;
 
-import expressionevaluator.src.entities.model.Operator;
+import expressionevaluator.src.entities.helperEntities.Operator;
 import expressionevaluator.src.service.interfaces.EvaluationService;
 import org.springframework.stereotype.Service;
 
@@ -80,7 +80,7 @@ public class EvaluationServiceImpl implements EvaluationService {
 
     private <T, U> boolean equals(T operand1, U operand2){
         if(operand1 == null && operand2 == null) return true;
-        assert operand1 != null;
+        else if (operand1 == null || operand2 == null) return false;
         if(operand1.getClass().equals(operand2.getClass())|| (operand2 instanceof Number && operand1 instanceof Number)){
             return operand1.equals(operand2);
         }

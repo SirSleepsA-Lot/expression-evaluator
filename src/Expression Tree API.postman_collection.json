@@ -1,0 +1,144 @@
+{
+	"info": {
+		"_postman_id": "eb2d35bc-3646-41b4-b7e8-432fc7599f5d",
+		"name": "Expression Tree API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24000403"
+	},
+	"item": [
+		{
+			"name": "EvaluateAnExpression",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customer\":\r\n  {\r\n    \"firstName\": \"JHON\",\r\n    \"lastName\": \"DOE\", \r\n    \"address\":\r\n    {\r\n      \"city\": \"Chicago\",\r\n      \"zipCode\": 1234, \r\n      \"street\": \"56th\", \r\n      \"houseNumber\": 2345\r\n    },\r\n    \"salary\": 99,\r\n    \"type\": \"BUSINESS\"\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{url}}:{{port}}/evaluate/{{id}}",
+					"protocol": "http",
+					"host": [
+						"{{url}}"
+					],
+					"port": "{{port}}",
+					"path": [
+						"evaluate",
+						"{{id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "VisualizeExpressionTree",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "(customer.firstName == \"JHON\" && customer.salary < 100) OR (customer.address != null && customer.address.city == \"Washington\")",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{url}}:{{port}}/visualize",
+					"protocol": "http",
+					"host": [
+						"{{url}}"
+					],
+					"port": "{{port}}",
+					"path": [
+						"visualize"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "SaveExpression",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"Expression Name\",\r\n  \"expression\": \"(customer.firstName == \\\"JHON\\\" && customer.salary < 100) OR (customer.address != null && customer.address.city == \\\"Washington\\\")\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{url}}:{{port}}/expression",
+					"protocol": "http",
+					"host": [
+						"{{url}}"
+					],
+					"port": "{{port}}",
+					"path": [
+						"expression"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "url",
+			"value": "localhost",
+			"type": "string"
+		},
+		{
+			"key": "port",
+			"value": "8080",
+			"type": "string"
+		},
+		{
+			"key": "id",
+			"value": "1",
+			"type": "string"
+		}
+	]
+}

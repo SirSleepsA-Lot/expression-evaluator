@@ -1,4 +1,4 @@
-package expressionevaluator.src.entities.model;
+package expressionevaluator.src.entities.helperEntities;
 
 public abstract class ExpressionValue {
     private String value;
@@ -13,11 +13,6 @@ public abstract class ExpressionValue {
     public void setValue(String value) {
         this.value = value;
     }
-
-
-
-
-
     @Override
     public String toString(){
         return value;

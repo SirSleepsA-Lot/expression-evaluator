@@ -3,17 +3,21 @@ package expressionevaluator.src.service;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import expressionevaluator.src.entities.model.Expression;
-import expressionevaluator.src.entities.model.Operator;
-import expressionevaluator.src.entities.model.Variable;
+import expressionevaluator.src.entities.helperEntities.Operator;
+import expressionevaluator.src.entities.helperEntities.TreeNode;
+import expressionevaluator.src.entities.helperEntities.Variable;
 import expressionevaluator.src.repository.ExpressionRepository;
 import expressionevaluator.src.service.interfaces.EvaluationService;
+import expressionevaluator.src.service.interfaces.ExpressionService;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
+import java.util.function.Predicate;
+
 @Service
-public class ExpressionService {
+public class ExpressionServiceImpl implements ExpressionService {
     private static final Map<String, Integer> precedenceMap;
     private final ExpressionRepository expressionRepository;
     private final EvaluationService evaluationService;
@@ -21,6 +25,7 @@ public class ExpressionService {
         precedenceMap = new HashMap<>();
         precedenceMap.put("||", 1);  // Logical OR has lowest precedence
         precedenceMap.put("&&", 2);  // Logical AND has higher precedence
+        precedenceMap.put("!", 7);
         precedenceMap.put("==", 3);  // Equality operators have higher precedence than logical AND
         precedenceMap.put("!=", 3);
         precedenceMap.put("<", 4);   // Comparison operators have higher precedence than equality operators
@@ -34,7 +39,7 @@ public class ExpressionService {
         precedenceMap.put("%", 6);
     }
 
-    public ExpressionService(ExpressionRepository expressionRepository, EvaluationService evaluationService) {
+    public ExpressionServiceImpl(ExpressionRepository expressionRepository, EvaluationService evaluationService) {
         this.expressionRepository = expressionRepository;
         this.evaluationService = evaluationService;
     }
@@ -42,9 +47,9 @@ public class ExpressionService {
         expressionRepository.save(expression);
         return expression;
     }
-    public String readVariable(String expression, Integer i){
+    private String readVariable(String expression, Integer i, Predicate<Character> condition){
         StringBuilder variableBuilder = new StringBuilder();
-        while (i < expression.length() && !operatorStart(expression.charAt(i)) && expression.charAt(i) != '(' && expression.charAt(i) != ')') {
+        while (i < expression.length() && condition.test(expression.charAt(i))) {
             variableBuilder.append(expression.charAt(i));
             i++;
         }
@@ -52,8 +57,19 @@ public class ExpressionService {
         return variableBuilder.toString();
 
     }
-    public Stack<Object> infixToPostfix(String expression) {
-        expression = expression.replaceAll("\\s", "");
+    private void pushOperatorToStack(Operator operator, Stack<Operator> operatorStack, Stack<Object> postfixStack){
+        while (!operatorStack.isEmpty() && precedence(operatorStack.peek().getValue()) >= precedence(operator.getValue())) {
+            Operator oper = operatorStack.pop();
+            if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
+            postfixStack.push(oper);
+        }
+        operatorStack.push(operator); // Push current operator to stack
+    }
+    private Stack<Object> infixToPostfix(String expression) {
+        Predicate<Character> variableCondition = ch -> !operatorStart(ch) && ch != '(' && ch != ')' && ch != ' ';
+        Predicate<Character> operatorCondition = ch -> !Character.isLetterOrDigit(ch) && ch != ' ' && ch != '(' && ch != ')' && ch != '\"';
+
+
         Stack<Operator> operatorStack = new Stack<>();
         Stack<Object> postfixStack = new Stack<>();
 
@@ -66,8 +82,10 @@ public class ExpressionService {
 
             if (Character.isLetter(ch) || ch == '_') {
                 // If it's a variable or operand
-                String readVariable = readVariable( expression, i);
+                String readVariable = readVariable( expression, i, variableCondition);
                 i += readVariable.length() - 1;
+                //readVariable = readVariable.trim();
+                Operator operator = null;
                 switch (readVariable) {
                     case "null":
                         postfixStack.push(null);
@@ -78,21 +96,34 @@ public class ExpressionService {
                     case "false":
                         postfixStack.push(false);
                         break;
+                    case "OR":
+                        operator = new Operator("||");
+                        pushOperatorToStack(operator, operatorStack, postfixStack);
+                        break;
+                    case "AND":
+                        operator = new Operator("&&");
+                        pushOperatorToStack(operator, operatorStack, postfixStack);
+                        break;
                     default:
                         Variable variableOrOperand = new Variable(readVariable);
                         postfixStack.push(variableOrOperand);
                 }
 
             } else if (Character.isDigit(ch)){
-                String number = readVariable( expression, i);
+                String number = readVariable( expression, i, variableCondition);
                 i += number.length() - 1;
                 float castedNumber = Float.parseFloat(number);
                 postfixStack.push(castedNumber);
             }else if (ch == '\"'){
-                String stringValue = readVariable( expression, i);
+                String stringValue = readVariable( expression, i, variableCondition);
                 i += stringValue.length() - 1;
 
                 postfixStack.push(stringValue.substring(1, stringValue.length() - 1));
+            }else if (ch == '\''){
+                String stringValue = readVariable( expression, i, variableCondition);
+                i += stringValue.length() - 1;
+
+                postfixStack.push(stringValue.replaceAll("'", ""));
             }else if (ch == '(') {
                 operatorStack.push(new Operator(ch + "")); // Push opening parenthesis to the stack
             } else if (ch == ')') {
@@ -104,21 +135,12 @@ public class ExpressionService {
                 if (!operatorStack.isEmpty() && operatorStack.peek().getValue().equals("(")) {
                     operatorStack.pop(); // Remove '(' from stack
                 }
-            } else {
+            }else {
                 // If it's an operator
-                StringBuilder operatorBuilder = new StringBuilder();
-                while (i < expression.length() && !Character.isLetterOrDigit(expression.charAt(i)) && expression.charAt(i) != ' ' && expression.charAt(i) != '(' && expression.charAt(i) != ')' && expression.charAt(i) != '\"') {
-                    operatorBuilder.append(expression.charAt(i));
-                    i++;
-                }
-                i--; // Move back one step, as the loop will increment it again
-                Operator operator = new Operator(operatorBuilder.toString());
-                while (!operatorStack.isEmpty() && precedence(operatorStack.peek().getValue()) >= precedence(operator.getValue())) {
-                    Operator oper = operatorStack.pop();
-                    if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
-                    postfixStack.push(oper);
-                }
-                operatorStack.push(operator); // Push current operator to stack
+                String operatorValue = readVariable(expression, i, operatorCondition);
+                i += operatorValue.length() - 1;
+                Operator operator = new Operator(operatorValue);
+                pushOperatorToStack(operator, operatorStack, postfixStack);
             }
         }
 
@@ -131,27 +153,75 @@ public class ExpressionService {
 
         return postfixStack;
     }
+    private static Stack<Object> flipStack(Stack<Object> stack) {
+        Stack<Object> tempStack = new Stack<>();
 
+        // Pop elements from the original stack and push them onto the temporary stack
+        while (!stack.isEmpty()) {
+            tempStack.push(stack.pop());
+        }
+
+        return tempStack;
+    }
+    private TreeNode buildExpressionTree(String expression) {
+        Stack<Object> postfixExpression = infixToPostfix(expression);
+        postfixExpression = flipStack(postfixExpression);
+        Stack<TreeNode> stack = new Stack<>();
+        while (!postfixExpression.isEmpty()) {
+            Object token = postfixExpression.pop();
+            if (token instanceof Operator) {
+                if(((Operator) token).getValue().equals("!")){
+                    TreeNode left = stack.pop();
+                    TreeNode operatorNode = new TreeNode(token);
+                    operatorNode.setLeft(left);
+                    stack.push(operatorNode);
+                }
+                else{
+                    TreeNode right = stack.pop();
+                    TreeNode left = stack.pop();
+                    TreeNode operatorNode = new TreeNode(token);
+                    operatorNode.setLeft(left);
+                    operatorNode.setRight(right);
+                    stack.push(operatorNode);
+                }
+
+            } else {
+                // Operand
+                stack.push(new TreeNode(token));
+            }
+
+        }
+
+        // The final expression tree will be the only element left in the stack
+        return stack.pop();
+    }
+    public String visualize(String expression) {
+        TreeNode root = buildExpressionTree(expression);
+        StringBuilder sb = new StringBuilder();
+        visualizeHelper(root, "", true, sb);
+        return sb.toString();
+    }
+
+    private void visualizeHelper(TreeNode node, String prefix, boolean isTail, StringBuilder sb) {
+        if (node != null) {
+            sb.append(prefix).append(isTail ? "└── " : "├── ").append(node.getValue()).append("\n");
+            visualizeHelper(node.getLeft(), prefix + (isTail ? "    " : "│   "), false, sb);
+            visualizeHelper(node.getRight(), prefix + (isTail ? "    " : "│   "), true, sb);
+        }
+    }
     private int precedence(String operator) {
         return precedenceMap.getOrDefault(operator, -1); // Get precedence from the map
     }
     private boolean operatorStart(Character ch){
         return precedence(ch + "") != -1 || precedence(ch + "&") != -1 || precedence(ch + "|") != -1 || precedence(ch + "=") != -1;
     }
-    public String getStackContents(Stack<Object> stack) {
-        StringBuilder result = new StringBuilder();
-        for (Object obj : stack) {
-            result.append(obj).append(" ");
-        }
-        return result.toString();
-    }
-
     private Object getVariableValue(Variable variable, JsonObject variables) throws Exception {
         // Split the variable by '.' to handle nested keys
         String[] keys = variable.getValue().split("\\.");
         JsonObject currentObj = variables;
+        JsonElement element = null;
         for (String key : keys) {
-            JsonElement element = currentObj.get(key);
+            element = currentObj.get(key);
             if (element != null && !element.isJsonNull()) {
                 if (element.isJsonObject()) {
                     currentObj = element.getAsJsonObject();
@@ -161,15 +231,17 @@ public class ExpressionService {
                     else if(element.getAsJsonPrimitive().isString()) return element.getAsString();
 
                 }
+            } else if(element != null && element.isJsonNull()){
+                return null;
             } else {
                 // Key not found or value is null, return false
                 throw new Exception(String.format("Variable %s not found in JSON object", variable));
             }
         }
-        return false;
+        return element;
     }
 
-    public boolean evaluateExpression(Long expressionId, JsonObject inputVariables) throws Exception {
+    private boolean evaluateExpressionDecrapated(Long expressionId, JsonObject inputVariables) throws Exception {
 
         var expressionEntity = expressionRepository.findById(expressionId).orElse(null);
         String expression;
@@ -212,5 +284,52 @@ public class ExpressionService {
         }
         return false;
     }
+    private Object evaluateExpressionTree(TreeNode root, JsonObject inputVariables) throws Exception {
 
+
+        var rootValue = root.getValue();
+        if(rootValue instanceof Operator){
+            var leftChild = root.getLeft().getValue();
+
+            if(leftChild instanceof Operator){
+                leftChild = evaluateExpressionTree(root.getLeft(), inputVariables);
+
+            }
+            else if(leftChild instanceof Variable){
+                leftChild = getVariableValue((Variable) leftChild, inputVariables);
+            }
+
+            if(((Operator) rootValue).getValue().equals("&&") && !((Boolean) leftChild)) return false;
+            else if(((Operator) rootValue).getValue().equals("||") && ((Boolean) leftChild)) return true;
+            else if(((Operator) rootValue).getValue().equals("!")) return !((Boolean) leftChild) ;
+
+            var rightChild = root.getRight().getValue();
+
+            if(rightChild instanceof Operator){
+                rightChild = evaluateExpressionTree(root.getRight(), inputVariables);
+
+            }
+            else if(rightChild instanceof Variable){
+                rightChild = getVariableValue((Variable) rightChild, inputVariables);
+            }
+            return evaluationService.resolve(leftChild, rightChild, (Operator) rootValue);
+
+        }
+        else if(rootValue instanceof Variable){
+            return getVariableValue((Variable) rootValue, inputVariables);
+        }
+        return rootValue;
+    }
+    public boolean evaluateExpression(Long expressionId, JsonObject inputVariables) throws Exception {
+        var expressionEntity = expressionRepository.findById(expressionId).orElse(null);
+        String expression;
+        if(expressionEntity != null){
+            expression = expressionEntity.getExpression();
+        }
+        else{
+            throw new Exception("expression not found");
+        }
+        TreeNode root = buildExpressionTree(expression);
+        return (boolean) evaluateExpressionTree(root, inputVariables);
+    }
 }

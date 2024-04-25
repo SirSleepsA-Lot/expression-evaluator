@@ -9,6 +9,15 @@ public class Expression {
     private Long id;
     private String name;
     private String expression;
+    public Expression() {
+
+    }
+    public Expression(String expression) {
+        this.expression = expression;
+    }
+
+
+
     public Long getId() {
         return id;
     }
