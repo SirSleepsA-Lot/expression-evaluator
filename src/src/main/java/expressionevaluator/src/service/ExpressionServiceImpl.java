@@ -23,18 +23,18 @@ public class ExpressionServiceImpl implements ExpressionService {
     private final EvaluationService evaluationService;
     static {
         precedenceMap = new HashMap<>();
-        precedenceMap.put("||", 1);  // Logical OR has lowest precedence
-        precedenceMap.put("&&", 2);  // Logical AND has higher precedence
+        precedenceMap.put("||", 1);
+        precedenceMap.put("&&", 2);
         precedenceMap.put("!", 7);
-        precedenceMap.put("==", 3);  // Equality operators have higher precedence than logical AND
+        precedenceMap.put("==", 3);
         precedenceMap.put("!=", 3);
-        precedenceMap.put("<", 4);   // Comparison operators have higher precedence than equality operators
+        precedenceMap.put("<", 4);
         precedenceMap.put(">", 4);
         precedenceMap.put("<=", 4);
         precedenceMap.put(">=", 4);
-        precedenceMap.put("+", 5);   // Addition and subtraction
+        precedenceMap.put("+", 5);
         precedenceMap.put("-", 5);
-        precedenceMap.put("*", 6);   // Multiplication, division, and modulus
+        precedenceMap.put("*", 6);
         precedenceMap.put("/", 6);
         precedenceMap.put("%", 6);
     }
@@ -53,7 +53,7 @@ public class ExpressionServiceImpl implements ExpressionService {
             variableBuilder.append(expression.charAt(i));
             i++;
         }
-        i--; // Move back one step, as the loop will increment it again
+        i--;
         return variableBuilder.toString();
 
     }
@@ -63,7 +63,7 @@ public class ExpressionServiceImpl implements ExpressionService {
             if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
             postfixStack.push(oper);
         }
-        operatorStack.push(operator); // Push current operator to stack
+        operatorStack.push(operator);
     }
     private Stack<Object> infixToPostfix(String expression) {
         Predicate<Character> variableCondition = ch -> !operatorStart(ch) && ch != '(' && ch != ')' && ch != ' ';
@@ -77,14 +77,12 @@ public class ExpressionServiceImpl implements ExpressionService {
             char ch = expression.charAt(i);
 
             if (ch == ' ') {
-                continue; // Skip whitespaces
+                continue;
             }
 
             if (Character.isLetter(ch) || ch == '_') {
-                // If it's a variable or operand
                 String readVariable = readVariable( expression, i, variableCondition);
                 i += readVariable.length() - 1;
-                //readVariable = readVariable.trim();
                 Operator operator = null;
                 switch (readVariable) {
                     case "null":
@@ -127,16 +125,14 @@ public class ExpressionServiceImpl implements ExpressionService {
             }else if (ch == '(') {
                 operatorStack.push(new Operator(ch + "")); // Push opening parenthesis to the stack
             } else if (ch == ')') {
-                // Pop operators and push to postfix stack until matching '('
                 while (!operatorStack.isEmpty() && !operatorStack.peek().getValue().equals("(")) {
                     Operator operator = operatorStack.pop();
                     postfixStack.push(operator);
                 }
                 if (!operatorStack.isEmpty() && operatorStack.peek().getValue().equals("(")) {
-                    operatorStack.pop(); // Remove '(' from stack
+                    operatorStack.pop();
                 }
             }else {
-                // If it's an operator
                 String operatorValue = readVariable(expression, i, operatorCondition);
                 i += operatorValue.length() - 1;
                 Operator operator = new Operator(operatorValue);
@@ -144,7 +140,6 @@ public class ExpressionServiceImpl implements ExpressionService {
             }
         }
 
-        // Pop remaining operators and push to postfix stack
         while (!operatorStack.isEmpty()) {
             Operator oper = operatorStack.pop();
             if(oper.getValue().equals("(") || oper.getValue().equals(")")) continue;
@@ -155,8 +150,6 @@ public class ExpressionServiceImpl implements ExpressionService {
     }
     private static Stack<Object> flipStack(Stack<Object> stack) {
         Stack<Object> tempStack = new Stack<>();
-
-        // Pop elements from the original stack and push them onto the temporary stack
         while (!stack.isEmpty()) {
             tempStack.push(stack.pop());
         }
@@ -186,13 +179,10 @@ public class ExpressionServiceImpl implements ExpressionService {
                 }
 
             } else {
-                // Operand
                 stack.push(new TreeNode(token));
             }
 
         }
-
-        // The final expression tree will be the only element left in the stack
         return stack.pop();
     }
     public String visualize(String expression) {
@@ -210,13 +200,12 @@ public class ExpressionServiceImpl implements ExpressionService {
         }
     }
     private int precedence(String operator) {
-        return precedenceMap.getOrDefault(operator, -1); // Get precedence from the map
+        return precedenceMap.getOrDefault(operator, -1);
     }
     private boolean operatorStart(Character ch){
         return precedence(ch + "") != -1 || precedence(ch + "&") != -1 || precedence(ch + "|") != -1 || precedence(ch + "=") != -1;
     }
     private Object getVariableValue(Variable variable, JsonObject variables) throws Exception {
-        // Split the variable by '.' to handle nested keys
         String[] keys = variable.getValue().split("\\.");
         JsonObject currentObj = variables;
         JsonElement element = null;
@@ -234,7 +223,6 @@ public class ExpressionServiceImpl implements ExpressionService {
             } else if(element != null && element.isJsonNull()){
                 return null;
             } else {
-                // Key not found or value is null, return false
                 throw new Exception(String.format("Variable %s not found in JSON object", variable));
             }
         }
