@@ -96,7 +96,7 @@ Two main functionalities are:
 
 ## Installation
 
-All you need to do is pull the project and run mvn spring-boot:run command
+All you need to do is pull the project and run `mvn spring-boot:run` command
 
 ## Usage
 
@@ -106,5 +106,5 @@ There are also test cases that can be run to test various expressions.
 ## Examples
 
 By calling /expression function an expression is saved and the function returns the expression id.
-Id can be used with a custom JSON using /evaluate function to evaluate said expression.
+Id can be used with a custom JSON using /evaluate/{expressionId} function to evaluate said expression.
 
